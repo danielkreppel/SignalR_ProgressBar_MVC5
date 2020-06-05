@@ -1,0 +1,96 @@
+﻿
+
+@section css {
+    <style>
+        #progress {
+            width: 100%;
+            background-color: ghostwhite;
+            margin-top: 10px;
+        }
+
+        #bar {
+            width: @((ViewBag.Finished != null && (bool)ViewBag.Finished) ? "100%" : "0%");
+            height: 30px;
+            background-color: darkgreen;
+        }
+    </style>
+}
+
+@using (Html.BeginForm("SimulateProcess", "Home", FormMethod.Post, new { enctype = "multipart/form-data", @class = "form-inline", id = "formProgress" }))
+{
+    @Html.Hidden("signalRconnectionId", "");
+
+    <div class="form-group col-sm-12 text-center">
+        <button type="submit" name="Submit" id="btnProcess" class="btn btn-primary">Process something in server</button>
+    </div>
+    <div class="form-group">
+        <label>Progress: <span id="progressText" style="padding-left:15px">@((ViewBag.Finished != null && (bool)ViewBag.Finished) ? "100%" : "0%")</span></label>
+    </div>
+    <div class="form-group" id="progress">
+        <div id="bar"></div>
+    </div>
+
+    if (ViewBag.Finished != null && (bool)ViewBag.Finished)
+    {
+        <div class="form-group col-sm-12 text-center">
+            <div class="alert-success" id="divProcessFinished">Process finished!</div>
+        </div>
+    }
+}
+
+@section scripts {
+
+    <script type="text/javascript">
+
+        var SignalrConnection;
+        var Proxy;
+
+        $(document).ready(Connect());
+
+        function Connect() {
+
+            var progressBar = document.getElementById("bar");
+            var progressText = document.getElementById("progressText");
+
+            ServerUrl = '@Request.Url.Scheme://@Request.Url.Authority'; 
+            var Url = ServerUrl + "/signalr";
+
+            //This will hold the connection to the signalr hub
+            SignalrConnection = $.hubConnection(Url, {
+                useDefaultPath: false
+            });
+
+            Proxy = SignalrConnection.createHubProxy('ProgressHub');
+
+            //connecting the client to the signalr hub
+            SignalrConnection.start()
+                .done(function () {
+                    console.log("Connected to Signalr Server");
+
+                    Proxy.invoke('GetConnectionId')
+                        .then(function (connectionId) {
+                            $("#signalRconnectionId").attr("value", connectionId);
+                        });
+                })
+                .fail(function () {
+                    console.log("failed in connecting to the signalr server");
+                })
+
+            Proxy.on("NotifyProgress", function (progress) {
+                progressBar.style.width = progress + "%";
+                progressText.innerText = progress + "%";
+            });
+        }
+
+        $('#formProgress').submit(function () {
+            $("#btnProcess", this)
+                .text("Please wait...")
+                .attr('disabled', 'disabled');
+
+            $('#divProcessFinished').hide();
+
+            return true;
+        });
+    </script>
+}
+    
